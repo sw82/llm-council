@@ -73,6 +73,43 @@
 }
 
 .conversation-meta {
-  color: #999;
-  font-size: 12px;
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+.conversation-actions {
+  display: flex;
+  gap: 0.5rem;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.conversation-item:hover .conversation-actions {
+  opacity: 1;
+}
+
+.action-btn {
+  background: none;
+  border: none;
+  color: inherit;
+  opacity: 0.5;
+  cursor: pointer;
+  padding: 2px;
+  font-size: 1rem;
+}
+
+.action-btn:hover {
+  opacity: 1;
+  color: #fff;
+}
+
+.edit-input {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  width: 100%;
+  font-family: inherit;
+  font-size: 0.9rem;
 }

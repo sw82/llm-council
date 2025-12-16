@@ -70,6 +70,24 @@ async def create_conversation(request: CreateConversationRequest):
     return conversation
 
 
+    return conversation
+
+
+@app.delete("/api/conversations/{conversation_id}")
+async def delete_conversation(conversation_id: str):
+    """Delete a conversation."""
+    storage.delete_conversation(conversation_id)
+    return {"status": "ok", "message": "Conversation deleted"}
+
+
+@app.patch("/api/conversations/{conversation_id}")
+async def update_conversation(conversation_id: str, request: dict):
+    """Update a conversation (e.g. title)."""
+    if "title" in request:
+        storage.update_conversation_title(conversation_id, request["title"])
+    return {"status": "ok", "message": "Conversation updated"}
+
+
 @app.get("/api/conversations/{conversation_id}", response_model=Conversation)
 async def get_conversation(conversation_id: str):
     """Get a specific conversation with all its messages."""

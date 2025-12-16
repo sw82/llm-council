@@ -181,6 +181,41 @@ function App() {
     }
   };
 
+  const handleRenameConversation = async (id, newTitle) => {
+    try {
+      await api.updateConversation(id, { title: newTitle });
+
+      // Update local state
+      setConversations(conversations.map(c =>
+        c.id === id ? { ...c, title: newTitle } : c
+      ));
+
+      // Update current conversation if selected
+      if (currentConversation && currentConversation.id === id) {
+        setCurrentConversation({ ...currentConversation, title: newTitle });
+      }
+    } catch (error) {
+      console.error('Failed to rename conversation:', error);
+    }
+  };
+
+  const handleDeleteConversation = async (id) => {
+    try {
+      await api.deleteConversation(id);
+
+      // Update local state
+      setConversations(conversations.filter(c => c.id !== id));
+
+      // If deleted conversation was selected, clear selection
+      if (currentConversationId === id) {
+        setCurrentConversationId(null);
+        setCurrentConversation(null);
+      }
+    } catch (error) {
+      console.error('Failed to delete conversation:', error);
+    }
+  };
+
   return (
     <div className="app">
       <Sidebar
@@ -188,6 +223,8 @@ function App() {
         currentConversationId={currentConversationId}
         onSelectConversation={handleSelectConversation}
         onNewConversation={handleNewConversation}
+        onRenameConversation={handleRenameConversation}
+        onDeleteConversation={handleDeleteConversation}
       />
       <ChatInterface
         conversation={currentConversation}
