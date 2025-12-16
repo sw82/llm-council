@@ -79,6 +79,29 @@ npm run dev
 
 Then open http://localhost:5173 in your browser.
 
+**Option 3: Run with Docker (Recommended for Servers)**
+
+This is the best way to run the app on a remote server while accessing it locally via SSH tunnel.
+
+1. Ensure `.env` is present with your API key.
+2. Run with docker-compose:
+   ```bash
+   docker-compose up -d --build
+   ```
+
+### Using via SSH Tunnel
+
+If you are running this on a remote server (e.g. AWS EC2, DigitalOcean Droplet, Home Server) and want to access it from your local machine:
+
+1. **On your server:** Start the app with Docker (Option 3 above).
+2. **On your local machine:** Create an SSH tunnel forwarding both ports:
+   ```bash
+   ssh -L 5173:localhost:5173 -L 8001:localhost:8001 user@your-server-ip
+   ```
+3. **Open:** http://localhost:5173
+
+The app is configured to listen on `0.0.0.0` within Docker and accept all origins, making it compatible with this setup.
+
 ## Tech Stack
 
 - **Backend:** FastAPI (Python 3.10+), async httpx, OpenRouter API
