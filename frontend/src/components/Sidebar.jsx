@@ -8,6 +8,7 @@ export default function Sidebar({
   onNewConversation,
   onRenameConversation,
   onDeleteConversation,
+  onShowLogs,
 }) {
   const [editingId, setEditingId] = useState(null);
   const [editTitle, setEditTitle] = useState('');
@@ -108,6 +109,12 @@ export default function Sidebar({
             </div>
           ))
         )}
+      </div>
+
+      <div className="sidebar-footer">
+        <button className="logs-btn" onClick={onShowLogs}>
+          📊 View Logs & Resources
+        </button>
       </div>
     </div>
   );

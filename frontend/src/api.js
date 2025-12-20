@@ -148,4 +148,15 @@ export const api = {
     }
     return response.json();
   },
+
+  /**
+   * Fetch recent logs.
+   */
+  async fetchLogs(limit = 100) {
+    const response = await fetch(`${API_BASE}/api/logs?limit=${limit}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch logs');
+    }
+    return response.json();
+  },
 };

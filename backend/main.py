@@ -12,6 +12,9 @@ import asyncio
 from . import storage
 from .council import run_full_council, generate_conversation_title, stage1_collect_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings
 
+import os
+
+
 app = FastAPI(title="LLM Council API")
 
 # Enable CORS for local development
@@ -22,6 +25,28 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Setup logging
+from .logger import setup_logger
+logger = setup_logger()
+
+
+@app.middleware("http")
+async def log_requests(request, call_next):
+    """Log all incoming requests."""
+    import time
+    start_time = time.time()
+    
+    response = await call_next(request)
+    
+    process_time = time.time() - start_time
+    logger.info(
+        f"Path: {request.url.path} Method: {request.method} "
+        f"Status: {response.status_code} Time: {process_time:.2f}s"
+    )
+    
+    return response
 
 
 class CreateConversationRequest(BaseModel):
@@ -132,6 +157,14 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
         stage3_result
     )
 
+    # Log usage
+    if 'usage' in metadata:
+        u = metadata['usage']
+        logger.info(
+            f"Council run complete. Usage: {u.get('total_tokens', 0)} tokens "
+            f"(Prompt: {u.get('prompt_tokens', 0)}, Completion: {u.get('completion_tokens', 0)})"
+        )
+
     # Return the complete response with metadata
     return {
         "stage1": stage1_results,
@@ -209,7 +242,31 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
         }
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
     )
+
+
+@app.get("/api/logs")
+async def get_logs(limit: int = 100):
+    """Get recent log entries."""
+    try:
+        log_file = os.path.join(storage.DATA_DIR, "app.log")
+        if not os.path.exists(log_file):
+            return {"logs": []}
+            
+        with open(log_file, 'r') as f:
+            lines = f.readlines()
+            # Return last N lines
+            return {"logs": lines[-limit:]}
+    except Exception as e:
+        logger.error(f"Error reading logs: {e}")
+        return {"logs": [], "error": str(e)}
 
 
 if __name__ == "__main__":

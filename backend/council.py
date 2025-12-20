@@ -26,7 +26,8 @@ async def stage1_collect_responses(user_query: str) -> List[Dict[str, Any]]:
         if response is not None:  # Only include successful responses
             stage1_results.append({
                 "model": model,
-                "response": response.get('content', '')
+                "response": response.get('content', ''),
+                "usage": response.get('usage', {})
             })
 
     return stage1_results
@@ -99,17 +100,27 @@ Now provide your evaluation and ranking:"""
 
     # Format results
     stage2_results = []
+    total_usage = {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0}
+
     for model, response in responses.items():
         if response is not None:
             full_text = response.get('content', '')
             parsed = parse_ranking_from_text(full_text)
+            
+            # Aggregate usage
+            usage = response.get('usage', {})
+            total_usage['prompt_tokens'] += usage.get('prompt_tokens', 0)
+            total_usage['completion_tokens'] += usage.get('completion_tokens', 0)
+            total_usage['total_tokens'] += usage.get('total_tokens', 0)
+
             stage2_results.append({
                 "model": model,
                 "ranking": full_text,
-                "parsed_ranking": parsed
+                "parsed_ranking": parsed,
+                "usage": usage
             })
 
-    return stage2_results, label_to_model
+    return stage2_results, label_to_model, total_usage
 
 
 async def stage3_synthesize_final(
@@ -170,7 +181,8 @@ Provide a clear, well-reasoned final answer that represents the council's collec
 
     return {
         "model": CHAIRMAN_MODEL,
-        "response": response.get('content', '')
+        "response": response.get('content', ''),
+        "usage": response.get('usage', {})
     }
 
 
@@ -314,7 +326,7 @@ async def run_full_council(user_query: str) -> Tuple[List, List, Dict, Dict]:
         }, {}
 
     # Stage 2: Collect rankings
-    stage2_results, label_to_model = await stage2_collect_rankings(user_query, stage1_results)
+    stage2_results, label_to_model, stage2_usage = await stage2_collect_rankings(user_query, stage1_results)
 
     # Calculate aggregate rankings
     aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
@@ -326,10 +338,32 @@ async def run_full_council(user_query: str) -> Tuple[List, List, Dict, Dict]:
         stage2_results
     )
 
+    # Calculate total usage
+    total_usage = {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0}
+    
+    # Stage 1 usage
+    for res in stage1_results:
+        u = res.get('usage', {})
+        total_usage['prompt_tokens'] += u.get('prompt_tokens', 0)
+        total_usage['completion_tokens'] += u.get('completion_tokens', 0)
+        total_usage['total_tokens'] += u.get('total_tokens', 0)
+
+    # Stage 2 usage (already aggregated)
+    total_usage['prompt_tokens'] += stage2_usage['prompt_tokens']
+    total_usage['completion_tokens'] += stage2_usage['completion_tokens']
+    total_usage['total_tokens'] += stage2_usage['total_tokens']
+
+    # Stage 3 usage
+    s3_usage = stage3_result.get('usage', {})
+    total_usage['prompt_tokens'] += s3_usage.get('prompt_tokens', 0)
+    total_usage['completion_tokens'] += s3_usage.get('completion_tokens', 0)
+    total_usage['total_tokens'] += s3_usage.get('total_tokens', 0)
+
     # Prepare metadata
     metadata = {
         "label_to_model": label_to_model,
-        "aggregate_rankings": aggregate_rankings
+        "aggregate_rankings": aggregate_rankings,
+        "usage": total_usage
     }
 
     return stage1_results, stage2_results, stage3_result, metadata
