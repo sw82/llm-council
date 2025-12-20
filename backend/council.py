@@ -3,22 +3,28 @@
 from typing import List, Dict, Any, Tuple
 from .openrouter import query_models_parallel, query_model
 from .config import COUNCIL_MODELS, CHAIRMAN_MODEL
+from .pricing import calculate_cost, fetch_openrouter_models
+import logging
+
+logger = logging.getLogger("llm_council")
 
 
-async def stage1_collect_responses(user_query: str) -> List[Dict[str, Any]]:
+async def stage1_collect_responses(user_query: str, models: List[str] = None) -> List[Dict[str, Any]]:
     """
     Stage 1: Collect individual responses from all council models.
 
     Args:
         user_query: The user's question
+        models: Optional list of models to use. Defaults to COUNCIL_MODELS.
 
     Returns:
         List of dicts with 'model' and 'response' keys
     """
+    target_models = models if models else COUNCIL_MODELS
     messages = [{"role": "user", "content": user_query}]
 
     # Query all models in parallel
-    responses = await query_models_parallel(COUNCIL_MODELS, messages)
+    responses = await query_models_parallel(target_models, messages)
 
     # Format results
     stage1_results = []
@@ -35,18 +41,21 @@ async def stage1_collect_responses(user_query: str) -> List[Dict[str, Any]]:
 
 async def stage2_collect_rankings(
     user_query: str,
-    stage1_results: List[Dict[str, Any]]
-) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
+    stage1_results: List[Dict[str, Any]],
+    models: List[str] = None
+) -> Tuple[List[Dict[str, Any]], Dict[str, str], Dict[str, Any]]:
     """
     Stage 2: Each model ranks the anonymized responses.
 
     Args:
         user_query: The original user query
         stage1_results: Results from Stage 1
+        models: Optional list of models to use. Defaults to COUNCIL_MODELS.
 
     Returns:
-        Tuple of (rankings list, label_to_model mapping)
+        Tuple of (rankings list, label_to_model mapping, usage stats)
     """
+    target_models = models if models else COUNCIL_MODELS
     # Create anonymized labels for responses (Response A, Response B, etc.)
     labels = [chr(65 + i) for i in range(len(stage1_results))]  # A, B, C, ...
 
@@ -96,7 +105,7 @@ Now provide your evaluation and ranking:"""
     messages = [{"role": "user", "content": ranking_prompt}]
 
     # Get rankings from all council models in parallel
-    responses = await query_models_parallel(COUNCIL_MODELS, messages)
+    responses = await query_models_parallel(target_models, messages)
 
     # Format results
     stage2_results = []
@@ -126,7 +135,8 @@ Now provide your evaluation and ranking:"""
 async def stage3_synthesize_final(
     user_query: str,
     stage1_results: List[Dict[str, Any]],
-    stage2_results: List[Dict[str, Any]]
+    stage2_results: List[Dict[str, Any]],
+    chairman_model: str = None
 ) -> Dict[str, Any]:
     """
     Stage 3: Chairman synthesizes final response.
@@ -135,10 +145,12 @@ async def stage3_synthesize_final(
         user_query: The original user query
         stage1_results: Individual model responses from Stage 1
         stage2_results: Rankings from Stage 2
+        chairman_model: Optional chairman model override.
 
     Returns:
         Dict with 'model' and 'response' keys
     """
+    target_model = chairman_model if chairman_model else CHAIRMAN_MODEL
     # Build comprehensive context for chairman
     stage1_text = "\n\n".join([
         f"Model: {result['model']}\nResponse: {result['response']}"
@@ -170,17 +182,17 @@ Provide a clear, well-reasoned final answer that represents the council's collec
     messages = [{"role": "user", "content": chairman_prompt}]
 
     # Query the chairman model
-    response = await query_model(CHAIRMAN_MODEL, messages)
+    response = await query_model(target_model, messages)
 
     if response is None:
         # Fallback if chairman fails
         return {
-            "model": CHAIRMAN_MODEL,
+            "model": target_model,
             "response": "Error: Unable to generate final synthesis."
         }
 
     return {
-        "model": CHAIRMAN_MODEL,
+        "model": target_model,
         "response": response.get('content', ''),
         "usage": response.get('usage', {})
     }
@@ -305,18 +317,24 @@ Title:"""
     return title
 
 
-async def run_full_council(user_query: str) -> Tuple[List, List, Dict, Dict]:
+async def run_full_council(
+    user_query: str, 
+    council_models: List[str] = None,
+    chairman_model: str = None
+) -> Tuple[List, List, Dict, Dict]:
     """
     Run the complete 3-stage council process.
 
     Args:
         user_query: The user's question
+        council_models: Optional list of council models
+        chairman_model: Optional chairman model
 
     Returns:
         Tuple of (stage1_results, stage2_results, stage3_result, metadata)
     """
     # Stage 1: Collect individual responses
-    stage1_results = await stage1_collect_responses(user_query)
+    stage1_results = await stage1_collect_responses(user_query, council_models)
 
     # If no models responded successfully, return error
     if not stage1_results:
@@ -326,7 +344,9 @@ async def run_full_council(user_query: str) -> Tuple[List, List, Dict, Dict]:
         }, {}
 
     # Stage 2: Collect rankings
-    stage2_results, label_to_model, stage2_usage = await stage2_collect_rankings(user_query, stage1_results)
+    stage2_results, label_to_model, stage2_usage = await stage2_collect_rankings(
+        user_query, stage1_results, council_models
+    )
 
     # Calculate aggregate rankings
     aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
@@ -335,35 +355,78 @@ async def run_full_council(user_query: str) -> Tuple[List, List, Dict, Dict]:
     stage3_result = await stage3_synthesize_final(
         user_query,
         stage1_results,
-        stage2_results
+        stage2_results,
+        chairman_model
     )
 
-    # Calculate total usage
+    # Calculate total usage and cost
     total_usage = {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0}
+    total_cost = 0.0
+    cost_breakdown = []
     
     # Stage 1 usage
     for res in stage1_results:
         u = res.get('usage', {})
-        total_usage['prompt_tokens'] += u.get('prompt_tokens', 0)
-        total_usage['completion_tokens'] += u.get('completion_tokens', 0)
+        model = res.get('model', 'unknown')
+        
+        pt = u.get('prompt_tokens', 0)
+        ct = u.get('completion_tokens', 0)
+        
+        total_usage['prompt_tokens'] += pt
+        total_usage['completion_tokens'] += ct
         total_usage['total_tokens'] += u.get('total_tokens', 0)
+        
+        cost = await calculate_cost(model, pt, ct)
+        total_cost += cost
+        cost_breakdown.append({"stage": "1", "model": model, "cost": cost})
 
-    # Stage 2 usage (already aggregated)
+    # Stage 2 usage (already aggregated usage in simple dict, but we need per-model breakdown ideally)
+    # Since stage2_usage is an aggregate, we'll try to reconstruct costs if possible, or just estimate.
+    # Actually, stage2_results has individual usage. Let's use that.
+    for res in stage2_results:
+        u = res.get('usage', {})
+        model = res.get('model', 'unknown')
+        
+        pt = u.get('prompt_tokens', 0)
+        ct = u.get('completion_tokens', 0)
+        
+        # Note: We already added prompt/completion tokens to total_usage in stage 2 logic? 
+        # Wait, previous logic was adding to total_usage locally in run_full_council, NOT inside stage2_collect_rankings return
+        # But wait, stage2_collect_rankings DOES assume we want the aggregate usage back. 
+        # But we need granular for cost.
+        
+        cost = await calculate_cost(model, pt, ct)
+        total_cost += cost
+        cost_breakdown.append({"stage": "2", "model": model, "cost": cost})
+
+    # Add stage 2 aggregate to total stats
     total_usage['prompt_tokens'] += stage2_usage['prompt_tokens']
     total_usage['completion_tokens'] += stage2_usage['completion_tokens']
     total_usage['total_tokens'] += stage2_usage['total_tokens']
 
+
     # Stage 3 usage
     s3_usage = stage3_result.get('usage', {})
-    total_usage['prompt_tokens'] += s3_usage.get('prompt_tokens', 0)
-    total_usage['completion_tokens'] += s3_usage.get('completion_tokens', 0)
+    s3_model = stage3_result.get('model', 'unknown')
+    
+    s3_pt = s3_usage.get('prompt_tokens', 0)
+    s3_ct = s3_usage.get('completion_tokens', 0)
+    
+    total_usage['prompt_tokens'] += s3_pt
+    total_usage['completion_tokens'] += s3_ct
     total_usage['total_tokens'] += s3_usage.get('total_tokens', 0)
+    
+    s3_cost = await calculate_cost(s3_model, s3_pt, s3_ct)
+    total_cost += s3_cost
+    cost_breakdown.append({"stage": "3", "model": s3_model, "cost": s3_cost})
 
     # Prepare metadata
     metadata = {
         "label_to_model": label_to_model,
         "aggregate_rankings": aggregate_rankings,
-        "usage": total_usage
+        "usage": total_usage,
+        "cost": round(total_cost, 6),
+        "cost_breakdown": cost_breakdown
     }
 
     return stage1_results, stage2_results, stage3_result, metadata

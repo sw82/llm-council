@@ -129,31 +129,32 @@ def add_user_message(conversation_id: str, content: str):
 
 def add_assistant_message(
     conversation_id: str,
-    stage1: List[Dict[str, Any]],
-    stage2: List[Dict[str, Any]],
-    stage3: Dict[str, Any]
+    stage1_results: List[Dict[str, Any]],
+    stage2_results: List[Dict[str, Any]],
+    stage3_result: Dict[str, Any],
+    metadata: Dict[str, Any] = None
 ):
     """
-    Add an assistant message with all 3 stages to a conversation.
-
-    Args:
-        conversation_id: Conversation identifier
-        stage1: List of individual model responses
-        stage2: List of model rankings
-        stage3: Final synthesized response
+    Add an assistant message (council response) to a conversation.
     """
     conversation = get_conversation(conversation_id)
-    if conversation is None:
+    if not conversation:
         raise ValueError(f"Conversation {conversation_id} not found")
 
-    conversation["messages"].append({
+    message = {
         "role": "assistant",
-        "stage1": stage1,
-        "stage2": stage2,
-        "stage3": stage3
-    })
-
+        "content": stage3_result.get("response", ""),  # Main content is the final answer
+        "stage1": stage1_results,
+        "stage2": stage2_results,
+        "stage3": stage3_result,
+        "timestamp": datetime.now().isoformat(),
+        "metadata": metadata or {}
+    }
+    
+    conversation["messages"].append(message)
+    conversation["updated_at"] = datetime.now().isoformat()
     save_conversation(conversation)
+    return message
 
 
 def update_conversation_title(conversation_id: str, title: str):

@@ -11,6 +11,7 @@ import asyncio
 
 from . import storage
 from .council import run_full_council, generate_conversation_title, stage1_collect_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings
+from .pricing import fetch_openrouter_models
 
 import os
 
@@ -57,6 +58,8 @@ class CreateConversationRequest(BaseModel):
 class SendMessageRequest(BaseModel):
     """Request to send a message in a conversation."""
     content: str
+    council_models: List[str] = None
+    chairman_model: str = None
 
 
 class ConversationMetadata(BaseModel):
@@ -85,6 +88,19 @@ async def root():
 async def list_conversations():
     """List all conversations (metadata only)."""
     return storage.list_conversations()
+
+
+@app.get("/api/models")
+async def list_models():
+    """List available OpenRouter models."""
+    try:
+        models = await fetch_openrouter_models()
+        # Sort by name
+        models.sort(key=lambda x: x.get("name", ""))
+        return {"models": models}
+    except Exception as e:
+        logger.error(f"Error fetching models: {e}")
+        return {"models": [], "error": str(e)}
 
 
 @app.post("/api/conversations", response_model=Conversation)
@@ -146,7 +162,9 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
 
     # Run the 3-stage council process
     stage1_results, stage2_results, stage3_result, metadata = await run_full_council(
-        request.content
+        request.content,
+        request.council_models,
+        request.chairman_model
     )
 
     # Add assistant message with all stages
@@ -154,15 +172,18 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
         conversation_id,
         stage1_results,
         stage2_results,
-        stage3_result
+        stage3_result,
+        metadata
     )
 
     # Log usage
     if 'usage' in metadata:
         u = metadata['usage']
+        cost = metadata.get('cost', 0.0)
         logger.info(
             f"Council run complete. Usage: {u.get('total_tokens', 0)} tokens "
-            f"(Prompt: {u.get('prompt_tokens', 0)}, Completion: {u.get('completion_tokens', 0)})"
+            f"(Prompt: {u.get('prompt_tokens', 0)}, Completion: {u.get('completion_tokens', 0)}). "
+            f"Est. Cost: ${cost:.6f}"
         )
 
     # Return the complete response with metadata
@@ -200,18 +221,25 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
 
             # Stage 1: Collect responses
             yield f"data: {json.dumps({'type': 'stage1_start'})}\n\n"
-            stage1_results = await stage1_collect_responses(request.content)
+            stage1_results = await stage1_collect_responses(request.content, request.council_models)
             yield f"data: {json.dumps({'type': 'stage1_complete', 'data': stage1_results})}\n\n"
 
             # Stage 2: Collect rankings
             yield f"data: {json.dumps({'type': 'stage2_start'})}\n\n"
-            stage2_results, label_to_model = await stage2_collect_rankings(request.content, stage1_results)
+            stage2_results, label_to_model, stage2_usage = await stage2_collect_rankings(
+                request.content, stage1_results, request.council_models
+            )
             aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
             yield f"data: {json.dumps({'type': 'stage2_complete', 'data': stage2_results, 'metadata': {'label_to_model': label_to_model, 'aggregate_rankings': aggregate_rankings}})}\n\n"
 
             # Stage 3: Synthesize final answer
             yield f"data: {json.dumps({'type': 'stage3_start'})}\n\n"
-            stage3_result = await stage3_synthesize_final(request.content, stage1_results, stage2_results)
+            stage3_result = await stage3_synthesize_final(
+                request.content, 
+                stage1_results, 
+                stage2_results,
+                request.chairman_model
+            )
             yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
 
             # Wait for title generation if it was started

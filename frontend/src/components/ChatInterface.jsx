@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import Stage1 from './Stage1';
 import Stage2 from './Stage2';
 import Stage3 from './Stage3';
+import ModelSettings from './ModelSettings';
 import './ChatInterface.css';
 
 export default function ChatInterface({
@@ -11,6 +12,9 @@ export default function ChatInterface({
   isLoading,
 }) {
   const [input, setInput] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [modelSettings, setModelSettings] = useState({});
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -21,11 +25,21 @@ export default function ChatInterface({
     scrollToBottom();
   }, [conversation]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (input.trim() && !isLoading) {
-      onSendMessage(input);
-      setInput('');
+      setIsSending(true);
+      try {
+        if (onSendMessage) {
+          // Use the prop passed from parent
+          await onSendMessage(conversation.id, input.trim(), modelSettings);
+        }
+        setInput('');
+      } catch (error) {
+        console.error("Error sending message:", error);
+      } finally {
+        setIsSending(false);
+      }
     }
   };
 
@@ -104,6 +118,21 @@ export default function ChatInterface({
                     </div>
                   )}
                   {msg.stage3 && <Stage3 finalResponse={msg.stage3} />}
+
+                  {/* Cost & Metadata Footer */}
+                  {msg.metadata && msg.metadata.cost && (
+                    <div className="message-footer">
+                      <div className={`cost-tag ${parseFloat(msg.metadata.cost) > 0.05 ? 'high-cost' : ''}`}>
+                        💰 Est. Cost: ${parseFloat(msg.metadata.cost).toFixed(5)}
+                        {parseFloat(msg.metadata.cost) > 0.05 && (
+                          <span className="expensive-badge" title="High token usage">⚠️</span>
+                        )}
+                      </div>
+                      <div className="usage-info">
+                        {msg.metadata.usage?.total_tokens} tokens
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -120,26 +149,34 @@ export default function ChatInterface({
         <div ref={messagesEndRef} />
       </div>
 
-      {conversation.messages.length === 0 && (
-        <form className="input-form" onSubmit={handleSubmit}>
-          <textarea
-            className="message-input"
-            placeholder="Ask your question... (Shift+Enter for new line, Enter to send)"
+      <div className="input-area">
+        <form onSubmit={handleSubmit}>
+          <button
+            type="button"
+            className="settings-btn"
+            onClick={() => setSettingsOpen(true)}
+            title="Configure Models"
+          >
+            ⚙️
+          </button>
+          <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={isLoading}
-            rows={3}
+            placeholder="Ask the council..."
+            disabled={isSending || isLoading}
           />
-          <button
-            type="submit"
-            className="send-button"
-            disabled={!input.trim() || isLoading}
-          >
+          <button type="submit" disabled={!input.trim() || isSending || isLoading}>
             Send
           </button>
         </form>
-      )}
+      </div>
+
+      <ModelSettings
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        initialSettings={modelSettings}
+        onSave={setModelSettings}
+      />
     </div>
   );
 }

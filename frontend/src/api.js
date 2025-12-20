@@ -49,7 +49,7 @@ export const api = {
   /**
    * Send a message in a conversation.
    */
-  async sendMessage(conversationId, content) {
+  async sendMessage(conversationId, content, settings = {}) {
     const response = await fetch(
       `${API_BASE}/api/conversations/${conversationId}/message`,
       {
@@ -57,7 +57,11 @@ export const api = {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({
+          content,
+          council_models: settings.council_models,
+          chairman_model: settings.chairman_model
+        }),
       }
     );
     if (!response.ok) {
@@ -67,49 +71,52 @@ export const api = {
   },
 
   /**
-   * Send a message and receive streaming updates.
-   * @param {string} conversationId - The conversation ID
-   * @param {string} content - The message content
-   * @param {function} onEvent - Callback function for each event: (eventType, data) => void
-   * @returns {Promise<void>}
-   */
-  async sendMessageStream(conversationId, content, onEvent) {
-    const response = await fetch(
-      `${API_BASE}/api/conversations/${conversationId}/message/stream`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ content }),
+  async sendMessageStream(conversationId, content, onEvent, settings = {}) {
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/conversations/${conversationId}/message/stream`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            content,
+            council_models: settings.council_models,
+            chairman_model: settings.chairman_model
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to send message');
       }
-    );
 
-    if (!response.ok) {
-      throw new Error('Failed to send message');
-    }
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
 
-      const chunk = decoder.decode(value);
-      const lines = chunk.split('\n');
-
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6);
-          try {
-            const event = JSON.parse(data);
-            onEvent(event.type, event);
-          } catch (e) {
-            console.error('Failed to parse SSE event:', e);
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            try {
+              const event = JSON.parse(data);
+              onEvent(event.type, event);
+            } catch (e) {
+              console.error('Failed to parse SSE event:', e);
+            }
           }
         }
       }
+    } catch (error) {
+      console.error('Stream error:', error);
+      throw error;
     }
   },
 
@@ -156,6 +163,17 @@ export const api = {
     const response = await fetch(`${API_BASE}/api/logs?limit=${limit}`);
     if (!response.ok) {
       throw new Error('Failed to fetch logs');
+    }
+    return response.json();
+  },
+
+  /**
+   * Fetch available models.
+   */
+  async fetchModels() {
+    const response = await fetch(`${API_BASE}/api/models`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch models');
     }
     return response.json();
   },
