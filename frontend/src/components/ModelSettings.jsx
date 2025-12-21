@@ -25,6 +25,15 @@ export default function ModelSettings({ isOpen, onClose, onSave, initialSettings
 
             let models = modelsData.models || [];
 
+            // Determine effective selection to use for sorting
+            let effectiveSelection = initialSettings.council_models || [];
+            if (!effectiveSelection || effectiveSelection.length === 0) {
+                if (configData.council_models) {
+                    effectiveSelection = configData.council_models;
+                    // We'll update the state below
+                }
+            }
+
             // Define popular models keywords/ids to prioritize
             const priorityTerms = [
                 'gpt-4', 'claude-3', 'gemini', 'llama-3'
@@ -36,21 +45,25 @@ export default function ModelSettings({ isOpen, onClose, onSave, initialSettings
                 const aId = a.id.toLowerCase();
                 const bId = b.id.toLowerCase();
 
+                // 1. Selected models always come first
+                const aSelected = effectiveSelection.includes(a.id);
+                const bSelected = effectiveSelection.includes(b.id);
+                if (aSelected && !bSelected) return -1;
+                if (!aSelected && bSelected) return 1;
+
+                // 2. Priority terms
                 const aPriority = priorityTerms.findIndex(term => aName.includes(term) || aId.includes(term));
                 const bPriority = priorityTerms.findIndex(term => bName.includes(term) || bId.includes(term));
 
-                // If both are priority models, sort by which priority term comes first in the list
                 if (aPriority !== -1 && bPriority !== -1) {
                     if (aPriority !== bPriority) return aPriority - bPriority;
                     return aName.localeCompare(bName);
                 }
 
-                // If only a is priority, it comes first
                 if (aPriority !== -1) return -1;
-                // If only b is priority, it comes first
                 if (bPriority !== -1) return 1;
 
-                // Otherwise sort alphabetically
+                // 3. Alphabetical
                 return aName.localeCompare(bName);
             });
 
