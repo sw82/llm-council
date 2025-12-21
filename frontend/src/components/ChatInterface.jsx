@@ -10,11 +10,12 @@ export default function ChatInterface({
   conversation,
   onSendMessage,
   isLoading,
+  modelSettings = {},
+  onUpdateSettings,
 }) {
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [modelSettings, setModelSettings] = useState({});
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -32,7 +33,7 @@ export default function ChatInterface({
       try {
         if (onSendMessage) {
           // Use the prop passed from parent
-          await onSendMessage(conversation.id, input.trim(), modelSettings);
+          await onSendMessage(input.trim());
         }
         setInput('');
       } catch (error) {
@@ -175,7 +176,7 @@ export default function ChatInterface({
         isOpen={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         initialSettings={modelSettings}
-        onSave={setModelSettings}
+        onSave={onUpdateSettings}
       />
     </div>
   );

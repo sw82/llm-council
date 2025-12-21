@@ -186,9 +186,11 @@ Provide a clear, well-reasoned final answer that represents the council's collec
 
     if response is None:
         # Fallback if chairman fails
+        logger.error(f"Chairman model {target_model} failed to respond")
         return {
             "model": target_model,
-            "response": "Error: Unable to generate final synthesis."
+            "response": f"Error: Unable to generate final synthesis. Chairman model '{target_model}' did not respond.",
+            "usage": {}
         }
 
     return {

@@ -12,6 +12,16 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
 
+  // Load model settings from localStorage
+  const [modelSettings, setModelSettings] = useState(() => {
+    try {
+      const saved = localStorage.getItem('llm-council-model-settings');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
   // Load conversations on mount
   useEffect(() => {
     loadConversations();
@@ -59,10 +69,13 @@ function App() {
     setCurrentConversationId(id);
   };
 
-  const handleSendMessage = async (content) => {
+  const handleSendMessage = async (content, settings = {}) => {
     if (!currentConversationId) return;
 
     setIsLoading(true);
+
+    // Merge passed settings with stored settings
+    const effectiveSettings = { ...modelSettings, ...settings };
     try {
       // Optimistically add user message to UI
       const userMessage = { role: 'user', content };
@@ -171,7 +184,7 @@ function App() {
           default:
             console.log('Unknown event type:', eventType);
         }
-      });
+      }, effectiveSettings);
     } catch (error) {
       console.error('Failed to send message:', error);
       // Remove optimistic messages on error
@@ -233,6 +246,11 @@ function App() {
         conversation={currentConversation}
         onSendMessage={handleSendMessage}
         isLoading={isLoading}
+        modelSettings={modelSettings}
+        onUpdateSettings={(newSettings) => {
+          setModelSettings(newSettings);
+          localStorage.setItem('llm-council-model-settings', JSON.stringify(newSettings));
+        }}
       />
       {showLogs && <LogViewer onClose={() => setShowLogs(false)} />}
     </div>
