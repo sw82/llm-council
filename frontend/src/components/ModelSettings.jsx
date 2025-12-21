@@ -143,7 +143,8 @@ export default function ModelSettings({ isOpen, onClose, onSave, initialSettings
                                             <div className="model-name">{m.name}</div>
                                             <div className="model-id">{m.id}</div>
                                             <div className="model-pricing">
-                                                Input: ${parseFloat(m.pricing?.prompt || 0) * 1000000} / 1M
+                                                <div>In: ${parseFloat(m.pricing?.prompt || 0) * 1000000} / 1M</div>
+                                                <div>Out: ${parseFloat(m.pricing?.completion || 0) * 1000000} / 1M</div>
                                             </div>
                                         </div>
                                     ))}
