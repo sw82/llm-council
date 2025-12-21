@@ -19,7 +19,38 @@ export default function ModelSettings({ isOpen, onClose, onSave, initialSettings
         try {
             setIsLoading(true);
             const data = await api.fetchModels();
-            setAvailableModels(data.models || []);
+            let models = data.models || [];
+
+            // Define popular models keywords/ids to prioritize
+            const priorityTerms = [
+                'gpt-4', 'claude-3', 'gemini', 'llama-3'
+            ];
+
+            models.sort((a, b) => {
+                const aName = a.name.toLowerCase();
+                const bName = b.name.toLowerCase();
+                const aId = a.id.toLowerCase();
+                const bId = b.id.toLowerCase();
+
+                const aPriority = priorityTerms.findIndex(term => aName.includes(term) || aId.includes(term));
+                const bPriority = priorityTerms.findIndex(term => bName.includes(term) || bId.includes(term));
+
+                // If both are priority models, sort by which priority term comes first in the list
+                if (aPriority !== -1 && bPriority !== -1) {
+                    if (aPriority !== bPriority) return aPriority - bPriority;
+                    return aName.localeCompare(bName);
+                }
+
+                // If only a is priority, it comes first
+                if (aPriority !== -1) return -1;
+                // If only b is priority, it comes first
+                if (bPriority !== -1) return 1;
+
+                // Otherwise sort alphabetically
+                return aName.localeCompare(bName);
+            });
+
+            setAvailableModels(models);
             setError(null);
         } catch (err) {
             setError('Failed to load models');

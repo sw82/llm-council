@@ -85,7 +85,12 @@ export default function Sidebar({
                       {conv.title || 'New Conversation'}
                     </div>
                     <div className="conversation-meta">
-                      {conv.message_count} messages
+                      <span>{conv.message_count} messages</span>
+                      {conv.total_cost > 0 && (
+                        <span className="conversation-cost">
+                          ${conv.total_cost.toFixed(4)}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="conversation-actions">

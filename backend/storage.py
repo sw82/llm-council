@@ -93,12 +93,25 @@ def list_conversations() -> List[Dict[str, Any]]:
             path = os.path.join(DATA_DIR, filename)
             with open(path, 'r') as f:
                 data = json.load(f)
+                
+                # Calculate total cost
+                total_cost = 0.0
+                for msg in data.get("messages", []):
+                    metadata = msg.get("metadata", {})
+                    # Cost might be a float or a string, handle safely
+                    try:
+                        cost = float(metadata.get("cost", 0.0))
+                        total_cost += cost
+                    except (ValueError, TypeError):
+                        pass
+
                 # Return metadata only
                 conversations.append({
                     "id": data["id"],
                     "created_at": data["created_at"],
                     "title": data.get("title", "New Conversation"),
-                    "message_count": len(data["messages"])
+                    "message_count": len(data["messages"]),
+                    "total_cost": total_cost
                 })
 
     # Sort by creation time, newest first
