@@ -270,13 +270,6 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
         }
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-        }
     )
 
 
