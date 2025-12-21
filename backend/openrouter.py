@@ -54,6 +54,10 @@ async def query_model(
                 }
             }
 
+    except httpx.HTTPStatusError as e:
+        print(f"HTTP error querying model {model}: {e.response.status_code}")
+        print(f"Response body: {e.response.text}")
+        return None
     except Exception as e:
         print(f"Error querying model {model}: {e}")
         return None
