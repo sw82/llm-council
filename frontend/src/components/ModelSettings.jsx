@@ -8,6 +8,7 @@ export default function ModelSettings({ isOpen, onClose, onSave, initialSettings
     const [selectedChairman, setSelectedChairman] = useState(initialSettings.chairman_model || '');
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
         if (isOpen) {
@@ -101,6 +102,13 @@ export default function ModelSettings({ isOpen, onClose, onSave, initialSettings
         });
     };
 
+    // Filter models based on search query
+    const filteredModels = availableModels.filter(m => {
+        if (!searchQuery) return true;
+        const query = searchQuery.toLowerCase();
+        return m.name.toLowerCase().includes(query) || m.id.toLowerCase().includes(query);
+    });
+
     const handleSave = () => {
         onSave({
             council_models: selectedCouncil.length > 0 ? selectedCouncil : null,
@@ -153,8 +161,17 @@ export default function ModelSettings({ isOpen, onClose, onSave, initialSettings
                             <div className="setting-section">
                                 <h3>Council Members</h3>
                                 <p className="description">Select models that provide initial responses and verify each other.</p>
+
+                                <input
+                                    type="text"
+                                    className="model-search"
+                                    placeholder="🔍 Search models..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                />
+
                                 <div className="models-grid">
-                                    {availableModels.map(m => (
+                                    {filteredModels.map(m => (
                                         <div
                                             key={m.id}
                                             className={`model-option ${selectedCouncil.includes(m.id) ? 'selected' : ''}`}

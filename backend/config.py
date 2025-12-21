@@ -12,15 +12,15 @@ except ImportError:
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 # Council members - list of OpenRouter model identifiers
-# Using free/cheaper models
+# Using only free models
 COUNCIL_MODELS = [
-    "google/gemini-flash-1.5-8b",
+    "nousresearch/hermes-3-llama-3.1-405b:free",
     "meta-llama/llama-3.1-8b-instruct:free",
     "microsoft/phi-3-mini-128k-instruct:free",
 ]
 
 # Chairman model - synthesizes final response
-CHAIRMAN_MODEL = "google/gemini-flash-1.5-8b"
+CHAIRMAN_MODEL = "nousresearch/hermes-3-llama-3.1-405b:free"
 
 # OpenRouter API endpoint
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"

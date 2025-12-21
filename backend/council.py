@@ -28,14 +28,18 @@ async def stage1_collect_responses(user_query: str, models: List[str] = None) ->
 
     # Format results
     stage1_results = []
+    all_errors = []
+    
     for model, response in responses.items():
         if response is not None:
             if response.get('error'):
                 # Include error in results
+                error_msg = response.get('error')
+                all_errors.append(f"{model}: {error_msg}")
                 stage1_results.append({
                     "model": model,
-                    "response": f"❌ Error: {response.get('error')}",
-                    "error": response.get('error'),
+                    "response": f"❌ Error: {error_msg}",
+                    "error": error_msg,
                     "usage": response.get('usage', {})
                 })
             elif response.get('content'):
@@ -45,6 +49,27 @@ async def stage1_collect_responses(user_query: str, models: List[str] = None) ->
                     "response": response.get('content', ''),
                     "usage": response.get('usage', {})
                 })
+    
+    # If ALL models failed, add a helpful message
+    if len(stage1_results) == 0 or all(r.get('error') for r in stage1_results):
+        stage1_results.append({
+            "model": "system",
+            "response": f"""⚠️ All council models failed. Common causes:
+
+1. **API Key Limit Exceeded**: Your OpenRouter key has reached its monthly limit
+   → Solution: Add credits at https://openrouter.ai/settings/keys
+
+2. **Invalid API Key**: Check your OPENROUTER_API_KEY environment variable
+   → Solution: Verify the key in your .env file
+
+3. **Model Not Available**: Some models may not be accessible
+   → Solution: Try different models in settings
+
+Errors received:
+{chr(10).join(f'  • {e}' for e in all_errors[:5])}""",
+            "error": "all_models_failed",
+            "usage": {}
+        })
 
     return stage1_results
 

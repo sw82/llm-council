@@ -143,6 +143,27 @@
     font-weight: 600;
 }
 
+.model-search {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.model-search:focus {
+    border-color: #4a9eff;
+}
+
+.model-search::placeholder {
+    color: #666;
+}
+
 .settings-footer {
     padding: 1rem;
     border-top: 1px solid #333;
