@@ -71,6 +71,8 @@ export const api = {
   },
 
   /**
+   * Send a message with streaming updates.
+   */
   async sendMessageStream(conversationId, content, onEvent, settings = {}) {
     try {
       const response = await fetch(
@@ -80,7 +82,7 @@ export const api = {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             content,
             council_models: settings.council_models,
             chairman_model: settings.chairman_model
