@@ -69,6 +69,7 @@ class ConversationMetadata(BaseModel):
     created_at: str
     title: str
     message_count: int
+    total_cost: float = 0.0
 
 
 class Conversation(BaseModel):
