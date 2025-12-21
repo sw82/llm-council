@@ -119,9 +119,28 @@
 }
 
 .model-pricing {
-    color: #48bb78;
-    font-size: 0.75rem;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #333;
+    font-size: 0.8rem;
     font-family: monospace;
+    color: #888;
+}
+
+.model-pricing .price-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 2px;
+}
+
+.model-pricing .label {
+    color: #666;
+    margin-right: 4px;
+}
+
+.model-pricing .value {
+    color: #48bb78;
+    font-weight: 600;
 }
 
 .settings-footer {

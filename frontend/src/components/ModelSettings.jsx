@@ -96,6 +96,13 @@ export default function ModelSettings({ isOpen, onClose, onSave, initialSettings
         onClose();
     };
 
+    const formatPrice = (priceStr) => {
+        const p = parseFloat(priceStr || 0) * 1000000;
+        if (p === 0) return 'Free';
+        if (p < 0.01) return '$' + p.toPrecision(2);
+        return '$' + p.toFixed(2);
+    };
+
     if (!isOpen) return null;
 
     return (
@@ -143,8 +150,14 @@ export default function ModelSettings({ isOpen, onClose, onSave, initialSettings
                                             <div className="model-name">{m.name}</div>
                                             <div className="model-id">{m.id}</div>
                                             <div className="model-pricing">
-                                                <div>In: ${parseFloat(m.pricing?.prompt || 0) * 1000000} / 1M</div>
-                                                <div>Out: ${parseFloat(m.pricing?.completion || 0) * 1000000} / 1M</div>
+                                                <div className="price-item">
+                                                    <span className="label">In:</span>
+                                                    <span className="value">{formatPrice(m.pricing?.prompt)}</span> / 1M
+                                                </div>
+                                                <div className="price-item">
+                                                    <span className="label">Out:</span>
+                                                    <span className="value">{formatPrice(m.pricing?.completion)}</span> / 1M
+                                                </div>
                                             </div>
                                         </div>
                                     ))}
