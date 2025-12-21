@@ -12,6 +12,7 @@ import asyncio
 from . import storage
 from .council import run_full_council, generate_conversation_title, stage1_collect_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings
 from .pricing import fetch_openrouter_models
+from . import config
 
 import os
 
@@ -101,6 +102,15 @@ async def list_models():
     except Exception as e:
         logger.error(f"Error fetching models: {e}")
         return {"models": [], "error": str(e)}
+
+
+@app.get("/api/config")
+async def get_config():
+    """Get system configuration (defaults)."""
+    return {
+        "council_models": config.COUNCIL_MODELS,
+        "chairman_model": config.CHAIRMAN_MODEL
+    }
 
 
 @app.post("/api/conversations", response_model=Conversation)

@@ -11,15 +11,19 @@ export default function ModelSettings({ isOpen, onClose, onSave, initialSettings
 
     useEffect(() => {
         if (isOpen) {
-            fetchModels();
+            loadData();
         }
     }, [isOpen]);
 
-    const fetchModels = async () => {
+    const loadData = async () => {
         try {
             setIsLoading(true);
-            const data = await api.fetchModels();
-            let models = data.models || [];
+            const [modelsData, configData] = await Promise.all([
+                api.fetchModels(),
+                api.fetchConfig()
+            ]);
+
+            let models = modelsData.models || [];
 
             // Define popular models keywords/ids to prioritize
             const priorityTerms = [
@@ -51,9 +55,23 @@ export default function ModelSettings({ isOpen, onClose, onSave, initialSettings
             });
 
             setAvailableModels(models);
+
+            // Apply defaults if no initial settings provided
+            if (!initialSettings.council_models || initialSettings.council_models.length === 0) {
+                if (configData.council_models) {
+                    setSelectedCouncil(configData.council_models);
+                }
+            }
+
+            if (!initialSettings.chairman_model) {
+                if (configData.chairman_model) {
+                    setSelectedChairman(configData.chairman_model);
+                }
+            }
+
             setError(null);
         } catch (err) {
-            setError('Failed to load models');
+            setError('Failed to load models or configuration');
             console.error(err);
         } finally {
             setIsLoading(false);

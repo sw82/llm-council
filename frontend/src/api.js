@@ -177,4 +177,15 @@ export const api = {
     }
     return response.json();
   },
+
+  /**
+   * Fetch system configuration (defaults).
+   */
+  async fetchConfig() {
+    const response = await fetch(`${API_BASE}/api/config`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch config');
+    }
+    return response.json();
+  },
 };
