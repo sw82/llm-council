@@ -6,6 +6,16 @@ import logging
 # Add current dir to path
 sys.path.append(os.getcwd())
 
+# Mock dotenv if missing (common in docker w/o rebuild)
+try:
+    import dotenv
+except ImportError:
+    # Create a dummy module
+    class MockDotEnv:
+        def load_dotenv(self):
+            pass
+    sys.modules["dotenv"] = MockDotEnv()
+
 from backend import storage, pricing
 
 # Setup logging
