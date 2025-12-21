@@ -29,12 +29,22 @@ async def stage1_collect_responses(user_query: str, models: List[str] = None) ->
     # Format results
     stage1_results = []
     for model, response in responses.items():
-        if response is not None:  # Only include successful responses
-            stage1_results.append({
-                "model": model,
-                "response": response.get('content', ''),
-                "usage": response.get('usage', {})
-            })
+        if response is not None:
+            if response.get('error'):
+                # Include error in results
+                stage1_results.append({
+                    "model": model,
+                    "response": f"❌ Error: {response.get('error')}",
+                    "error": response.get('error'),
+                    "usage": response.get('usage', {})
+                })
+            elif response.get('content'):
+                # Successful response
+                stage1_results.append({
+                    "model": model,
+                    "response": response.get('content', ''),
+                    "usage": response.get('usage', {})
+                })
 
     return stage1_results
 
@@ -184,13 +194,15 @@ Provide a clear, well-reasoned final answer that represents the council's collec
     # Query the chairman model
     response = await query_model(target_model, messages)
 
-    if response is None:
+    if response is None or response.get('error') or not response.get('content'):
         # Fallback if chairman fails
-        logger.error(f"Chairman model {target_model} failed to respond")
+        error_detail = response.get('error', 'No response') if response else 'No response'
+        logger.error(f"Chairman model {target_model} failed: {error_detail}")
         return {
             "model": target_model,
-            "response": f"Error: Unable to generate final synthesis. Chairman model '{target_model}' did not respond.",
-            "usage": {}
+            "response": f"❌ Chairman Error: {error_detail}",
+            "error": error_detail,
+            "usage": response.get('usage', {}) if response else {}
         }
 
     return {
