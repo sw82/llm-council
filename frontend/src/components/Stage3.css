@@ -1,6 +1,33 @@
-.stage3 {
+.stage-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.copy-btn {
+  background: #ffffff;
+  border: 1px solid #c8e6c8;
+  color: #2d8a2d;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.copy-btn:hover {
   background: #f0fff0;
-  border-color: #c8e6c8;
+  border-color: #2d8a2d;
+}
+
+.copy-btn.copied {
+  background: #e6fffa;
+  border-color: #38b2ac;
+  color: #2c7a7b;
 }
 
 .final-response {
