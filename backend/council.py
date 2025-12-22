@@ -356,6 +356,76 @@ Title:"""
     return title
 
 
+async def calculate_council_metadata(
+    stage1_results: List[Dict[str, Any]],
+    stage2_results: List[Dict[str, Any]],
+    stage3_result: Dict[str, Any],
+    label_to_model: Dict[str, str],
+    aggregate_rankings: List[Dict[str, Any]]
+) -> Dict[str, Any]:
+    """
+    Calculate total usage and cost metadata for a council run.
+    """
+    total_usage = {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0}
+    total_cost = 0.0
+    cost_breakdown = []
+    
+    # Stage 1 usage
+    for res in stage1_results:
+        u = res.get('usage', {})
+        model = res.get('model', 'unknown')
+        
+        pt = u.get('prompt_tokens', 0)
+        ct = u.get('completion_tokens', 0)
+        
+        total_usage['prompt_tokens'] += pt
+        total_usage['completion_tokens'] += ct
+        total_usage['total_tokens'] += u.get('total_tokens', 0)
+        
+        cost = await calculate_cost(model, pt, ct)
+        total_cost += cost
+        cost_breakdown.append({"stage": "1", "model": model, "cost": cost})
+
+    # Stage 2 usage
+    for res in stage2_results:
+        u = res.get('usage', {})
+        model = res.get('model', 'unknown')
+        
+        pt = u.get('prompt_tokens', 0)
+        ct = u.get('completion_tokens', 0)
+        
+        total_usage['prompt_tokens'] += pt
+        total_usage['completion_tokens'] += ct
+        total_usage['total_tokens'] += u.get('total_tokens', 0)
+        
+        cost = await calculate_cost(model, pt, ct)
+        total_cost += cost
+        cost_breakdown.append({"stage": "2", "model": model, "cost": cost})
+
+    # Stage 3 usage
+    s3_usage = stage3_result.get('usage', {})
+    s3_model = stage3_result.get('model', 'unknown')
+    
+    s3_pt = s3_usage.get('prompt_tokens', 0)
+    s3_ct = s3_usage.get('completion_tokens', 0)
+    
+    total_usage['prompt_tokens'] += s3_pt
+    total_usage['completion_tokens'] += s3_ct
+    total_usage['total_tokens'] += s3_usage.get('total_tokens', 0)
+    
+    s3_cost = await calculate_cost(s3_model, s3_pt, s3_ct)
+    total_cost += s3_cost
+    cost_breakdown.append({"stage": "3", "model": s3_model, "cost": s3_cost})
+
+    return {
+        "label_to_model": label_to_model,
+        "aggregate_rankings": aggregate_rankings,
+        "usage": total_usage,
+        "cost": round(total_cost, 6),
+        "cost_breakdown": cost_breakdown
+    }
+
+
 async def run_full_council(
     user_query: str, 
     council_models: List[str] = None,
@@ -398,74 +468,13 @@ async def run_full_council(
         chairman_model
     )
 
-    # Calculate total usage and cost
-    total_usage = {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0}
-    total_cost = 0.0
-    cost_breakdown = []
-    
-    # Stage 1 usage
-    for res in stage1_results:
-        u = res.get('usage', {})
-        model = res.get('model', 'unknown')
-        
-        pt = u.get('prompt_tokens', 0)
-        ct = u.get('completion_tokens', 0)
-        
-        total_usage['prompt_tokens'] += pt
-        total_usage['completion_tokens'] += ct
-        total_usage['total_tokens'] += u.get('total_tokens', 0)
-        
-        cost = await calculate_cost(model, pt, ct)
-        total_cost += cost
-        cost_breakdown.append({"stage": "1", "model": model, "cost": cost})
-
-    # Stage 2 usage (already aggregated usage in simple dict, but we need per-model breakdown ideally)
-    # Since stage2_usage is an aggregate, we'll try to reconstruct costs if possible, or just estimate.
-    # Actually, stage2_results has individual usage. Let's use that.
-    for res in stage2_results:
-        u = res.get('usage', {})
-        model = res.get('model', 'unknown')
-        
-        pt = u.get('prompt_tokens', 0)
-        ct = u.get('completion_tokens', 0)
-        
-        # Note: We already added prompt/completion tokens to total_usage in stage 2 logic? 
-        # Wait, previous logic was adding to total_usage locally in run_full_council, NOT inside stage2_collect_rankings return
-        # But wait, stage2_collect_rankings DOES assume we want the aggregate usage back. 
-        # But we need granular for cost.
-        
-        cost = await calculate_cost(model, pt, ct)
-        total_cost += cost
-        cost_breakdown.append({"stage": "2", "model": model, "cost": cost})
-
-    # Add stage 2 aggregate to total stats
-    total_usage['prompt_tokens'] += stage2_usage['prompt_tokens']
-    total_usage['completion_tokens'] += stage2_usage['completion_tokens']
-    total_usage['total_tokens'] += stage2_usage['total_tokens']
-
-
-    # Stage 3 usage
-    s3_usage = stage3_result.get('usage', {})
-    s3_model = stage3_result.get('model', 'unknown')
-    
-    s3_pt = s3_usage.get('prompt_tokens', 0)
-    s3_ct = s3_usage.get('completion_tokens', 0)
-    
-    total_usage['prompt_tokens'] += s3_pt
-    total_usage['completion_tokens'] += s3_ct
-    total_usage['total_tokens'] += s3_usage.get('total_tokens', 0)
-    
-    s3_cost = await calculate_cost(s3_model, s3_pt, s3_ct)
-    total_cost += s3_cost
-    cost_breakdown.append({"stage": "3", "model": s3_model, "cost": s3_cost})
-
-    # Prepare metadata
-    metadata = {
-        "label_to_model": label_to_model,
-        "aggregate_rankings": aggregate_rankings,
-        "usage": total_usage,
-        "cost": round(total_cost, 6),
-        "cost_breakdown": cost_breakdown
-    }
+    # Calculate metadata using extracted logic
+    metadata = await calculate_council_metadata(
+        stage1_results,
+        stage2_results,
+        stage3_result,
+        label_to_model,
+        aggregate_rankings
+    )
 
     return stage1_results, stage2_results, stage3_result, metadata

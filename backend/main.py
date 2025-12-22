@@ -10,7 +10,7 @@ import json
 import asyncio
 
 from . import storage
-from .council import run_full_council, generate_conversation_title, stage1_collect_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings
+from .council import run_full_council, generate_conversation_title, stage1_collect_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings, calculate_council_metadata
 from .pricing import fetch_openrouter_models
 from . import config
 
@@ -259,12 +259,22 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                 storage.update_conversation_title(conversation_id, title)
                 yield f"data: {json.dumps({'type': 'title_complete', 'data': {'title': title}})}\n\n"
 
-            # Save complete assistant message
+            # Calculate metadata for cost and usage
+            metadata = await calculate_council_metadata(
+                stage1_results,
+                stage2_results,
+                stage3_result,
+                label_to_model,
+                aggregate_rankings
+            )
+
+            # Save complete assistant message with metadata
             storage.add_assistant_message(
                 conversation_id,
                 stage1_results,
                 stage2_results,
-                stage3_result
+                stage3_result,
+                metadata
             )
 
             # Send completion event
